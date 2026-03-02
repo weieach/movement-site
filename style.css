@@ -2,7 +2,69 @@ html, body {
   margin: 0;
   padding: 0;
 }
+
+body{
+    /* background-image: url(data/placeholder.png); */
+    background-color: #F0F0F0;
+}
+
 canvas {
   display: block;
   
+}
+
+#dancerWrapper{
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    aspect-ratio: 1728 / 990;
+}
+
+#musicBackgroundWrapper{
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 8000px;
+    width: 100vw;
+    z-index: 10;
+}
+
+
+.placeholder-rect{
+    position: absolute;
+    width: 300px;
+    height: 200px;
+    top: 2000px;
+    left: 100px;
+    
+    background-color: black;
+    
+    padding: 20px;
+}
+
+.rect-2{
+    top: 4000px;
+    left: 1300px;
+    /* right: 200px; */
+}
+
+.rect-3{
+    top: 6000px;
+    left: 100px;
+    /* right: 200px; */
+}
+
+.placeholder-rects{
+    position: absolute;
+    background-color: aqua;
+    width: fit-content;
+    height: 500px;
+    z-index: 200;
+    padding-bottom: 200px;
+}
+
+.placeholder-rect p{
+    color: white;
 }
