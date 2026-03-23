@@ -4,34 +4,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Movement</title>
+    <title>Cartographies of Dance</title>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.11.11/lib/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.11.11/lib/addons/p5.sound.min.js"></script>
     <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
     <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="icon" type="image/png" href="data/favicon.png">
     <meta charset="utf-8">
+    <!-- phosphor icons -->
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css" />
 </head>
 
 <body>
     <main>
         <div id="dancerWrapper"></div>
+        <div id="ditherMaskCanvasWrapper" aria-hidden="true"></div>
+        <div id="flowFieldCanvasWrapper" aria-hidden="true"></div>
         <div id="musicBackgroundWrapper"></div>
-        <div class="placeholder-rects">
-            <div class="placeholder-rect">
-                <p>This is a textbox</p>
+        <!-- <div id="lyricsWrapper"></div> -->
+        <div class="panel-visualization-controls">
+            <div id="faceSquaresWrapper" aria-hidden="true"></div>
+            <div class="btns-overall-control">
+                <button type="button" aria-label="Scroll to top"><i class="ph-bold ph-arrow-line-up"
+                        aria-hidden="true"></i></button>
+                <button type="button" aria-label="Play"><i class="ph-fill ph-play" aria-hidden="true"></i></button>
+                <button type="button" aria-label="Mute"><i class="ph-fill ph-speaker-simple-high"
+                        aria-hidden="true"></i></button>
             </div>
-            <div class="placeholder-rect rect-2">
-                <p>This is another textbox</p>
+            <div class="controls-menu">
+                <p class="controls-menu-title">See movement as...</p>
+                <label class="blend-radio-label">
+                    <input type="radio" name="blend-mode" class="blend-radio" value="color" checked>
+                    <span class="blend-radio-custom"></span>
+                    <span class="blend-radio-text">Tracing</span>
+                </label>
+                <label class="blend-radio-label">
+                    <input type="radio" name="blend-mode" class="blend-radio" value="normal">
+                    <span class="blend-radio-custom"></span>
+                    <span class="blend-radio-text">Skeletal</span>
+                </label>
+                <label class="blend-radio-label">
+                    <input type="radio" name="blend-mode" class="blend-radio" value="flow">
+                    <span class="blend-radio-custom"></span>
+                    <span class="blend-radio-text">Flow of energy</span>
+                </label>
             </div>
-            <div class="placeholder-rect rect-3">
-                <p>This is a third textbox</p>
+            <div class="panel-controls-header">
+                <p>Controls</p>
             </div>
         </div>
+        <div class="placeholder-rects">
+            <!-- <div class="placeholder-rect">
+                <p>This is a textbox</p>
+                
+            </div> -->
+            <img src="data/album-cover.png" alt="album cover" class="img-album-cover">
+            <img src="data/mv-screenshot1-imagetreated.png" alt="mv screenshot 1" class="img-mv-screenshot1">
+            <img src="data/mv-screen2.png" alt="mv screenshot 2" class="img-mv-screenshot2">
+            <img src="data/end-screen-fin.png" alt="end screen" class="img-end-screen">
+
+            <!-- <div class="placeholder-rect rect-2">
+                <p>This is another textbox</p>
+            </div> -->
+            <video loop autoplay muted playsinline class="eye-vid" src="data/eye vid.mp4"></video>
+        </div>
+        <!-- dither video + mask: drawn on dancer canvas (dancer.js) -->
+        <img src="data/large-mask-foundation.png" alt="large mask" class="large-mask-foundation">
+        <img src="data/large-mask-overlay.png" alt="large mask" class="large-mask-overlay">
+
+
+
+        <!-- top left -->
+        <div class="panel-info" data-panel-state="soundtrack">
+            <div class="panel-info-display-stack" aria-live="polite">
+                <ul class="panel-info-display panel-info-display--soundtrack is-active">
+                    <li>"Attention"</li>
+                    <li>Omay Lay</li>
+                    <li>Justin Bieber</li>
+                </ul>
+                <ul class="panel-info-display panel-info-display--dancers">
+                    <li>Haley Fitzgerald</li>
+                    <li>Jazz Smith</li>
+                    <li>Effie Tutko</li>
+                </ul>
+                <div class="panel-info-display panel-info-display--choreographer">
+                    <div class="panel-choreographer-oval">
+                        <p class="panel-choreographer-name">Kyle Hanagami</p>
+                    </div>
+                </div>
+                <div class="panel-info-display panel-info-display--designer">
+                    <div class="panel-designer-oval panel-designer-oval--name">
+                        <p class="panel-designer-name">Nicole Wei</p>
+                    </div>
+                    <div class="panel-designer-oval panel-designer-oval--semester">
+                        <p class="panel-designer-name">Spring 2026</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-info-controls">
+                <button type="button" class="btn-info-change"
+                    aria-label="Cycle info: Soundtrack, Dancers, Choreographer, Designer">
+                    <i class="ph-bold ph-arrows-clockwise" aria-hidden="true"></i>
+                </button>
+                <div class="panel-info-text-wrap">
+                    <p class="panel-info-line panel-info-line--soundtrack is-active">Info: Soundtrack</p>
+                    <p class="panel-info-line panel-info-line--dancers">Info: Dancers</p>
+                    <p class="panel-info-line panel-info-line--choreographer">Choreographer</p>
+                    <p class="panel-info-line panel-info-line--designer">Web Design &amp; Dev</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- tooltip -->
+         <p class="tooltip-pause-play">Press space key to play/pause</p>
+         <p class="tooltip-lyrics">[Scroll down for <a href="#lyric-placer">lyrics</a>]</p>
+         <p id="lyric-placer">lyric placerholder</p>
+
     </main>
-    
+
+    <script src="beat-detection-shared.js"></script>
+    <script src="dither-mask.js"></script>
     <script src="dancer.js"></script>
+    <script src="pose-polygon-overlay.js"></script>
+    <script src="flow-field.js"></script>
     <script type="module" src="music-background.js"></script>
+    <script type="module" src="face-squares.js"></script>
+    <!-- <script type="module" src="lyrics.js"></script> -->
+    <script src="panel-info.js"></script>
+    <script src="scroll-controls.js"></script>
     <!-- <script src="ascii.js"></script> -->
+    <script>
+      (function () {
+        const dancer = document.getElementById("dancerWrapper");
+        const dither = document.getElementById("ditherMaskCanvasWrapper");
+        const flow = document.getElementById("flowFieldCanvasWrapper");
+        function applyBlendMode(value) {
+          if (value === "color") {
+            dancer.style.opacity = "1";
+            dancer.style.mixBlendMode = "color";
+            dither.style.opacity = "1";
+            flow.style.opacity = "0";
+          } else if (value === "flow") {
+            dancer.style.opacity = "0";
+            dither.style.mixBlendMode = "normal";
+            dither.style.opacity = "1";
+            flow.style.opacity = "1";
+          } else {
+            dancer.style.opacity = "1";
+            dancer.style.mixBlendMode = "normal";
+            dither.style.opacity = "0";
+            flow.style.opacity = "0";
+          }
+        }
+        document.querySelectorAll('.blend-radio').forEach(function (radio) {
+          radio.addEventListener("change", function () {
+            if (this.checked) applyBlendMode(this.value);
+          });
+        });
+        var initial = document.querySelector('.blend-radio:checked');
+        if (initial) applyBlendMode(initial.value);
+      })();
+    </script>
 </body>
 
 </html>

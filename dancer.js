@@ -1,9 +1,11 @@
 let bgm;
 let vid;
+let vidDither;
+let largeMaskImg;
 let pacmanGif;
 let statusFont;
 
-let statusText = "bgm is paused";
+let statusText = "click to play";
 let amp;
 
 let bodyPose;
@@ -14,29 +16,144 @@ let connections;
 let beatColor = "red";
 let beatColorSwitch = false;
 let beatPairCounter = 0;
+let flashUntilMs = 0;
 
 let bgmMidi;
 
-let beat = {
-  threshold: 0.2, // starting threshold (tune), default is 0.15
-  decayRate: 0.98, // how fast threshold falls back down (0.90–0.995)
-  holdTimeMs: 120, // minimum time between beats (80–200ms)
-  lastBeatMs: 0,
-  minThreshold: 0.2, // don’t let it decay to 0; default is 0.05
-};
-
-let flashUntilMs = 0;
+// Beat thresholds/state live in beat-detection-shared.js (shared with face-squares.js)
+const beat = MovementBeatDetection.beat;
 
 let dancerWrapper;
 const aspect = 1728 / 990;
 
+/**
+ * In WEBGL, mouseX/mouseY (and pmouse*) can be undefined/NaN until interaction — feeding line()
+ * breaks p5 internals (p5.Vector.prototype.mult warnings every frame).
+ */
+function movementSiteMouseLineCoords(offsetX, offsetY) {
+  if (
+    ![offsetX, offsetY].every(
+      (v) => typeof v === "number" && Number.isFinite(v)
+    )
+  ) {
+    return null;
+  }
+  const x0 = pmouseX + offsetX;
+  const y0 = pmouseY + offsetY;
+  const x1 = mouseX + offsetX;
+  const y1 = mouseY + offsetY;
+  const ok = [x0, y0, x1, y1].every(
+    (v) => typeof v === "number" && Number.isFinite(v)
+  );
+  return ok ? [x0, y0, x1, y1] : null;
+}
 
+/** ml5 keypoints: flat x/y or PoseNet-style position; skip bad values to avoid p5.Vector.mult spam in WEBGL line(). */
+function movementSiteKeypointXY(kp) {
+  if (!kp) return null;
+  let x = kp.x;
+  let y = kp.y;
+  if (typeof x !== "number" || typeof y !== "number") {
+    const p = kp.position;
+    if (p && typeof p.x === "number" && typeof p.y === "number") {
+      x = p.x;
+      y = p.y;
+    }
+  }
+  x = Number(x);
+  y = Number(y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+/**
+ * After "play from here" while paused: bgm time jumps immediately; videos keep old frame until Play.
+ * Cleared when playback starts (control bar or any resume path).
+ */
+let pendingVideoSyncTime = null;
+
+/** Reliable clock for sync: p5 SoundFile often reports currentTime() as 0 while paused. */
+function movementSiteReadPlaybackSeconds() {
+  const el = (v) =>
+    v && v.elt && typeof v.elt.currentTime === "number"
+      ? v.elt.currentTime
+      : NaN;
+  const tv = el(vid);
+  const td = el(vidDither);
+  if (Number.isFinite(tv) && tv >= 0) return tv;
+  if (Number.isFinite(td) && td >= 0) return td;
+  if (bgm && typeof bgm.currentTime === "function") {
+    const c = bgm.currentTime();
+    if (Number.isFinite(c) && c >= 0) return c;
+  }
+  if (pendingVideoSyncTime != null && Number.isFinite(pendingVideoSyncTime)) {
+    return pendingVideoSyncTime;
+  }
+  return 0;
+}
+
+function movementSiteStartPlaybackSynced() {
+  if (!bgm) return;
+
+  // Only seek when there's a pending scrub time (from seekTo while paused).
+  // For plain pause→resume, just loop — the video element already holds its position.
+  if (pendingVideoSyncTime != null) {
+    const t = pendingVideoSyncTime;
+    pendingVideoSyncTime = null;
+    if (vid && typeof vid.time === "function") vid.time(t);
+    if (vidDither && typeof vidDither.time === "function") vidDither.time(t);
+  }
+
+  if (vid) vid.loop();
+  if (vidDither) vidDither.loop();
+  bgm.play();
+
+  window.dispatchEvent(
+    new CustomEvent("movementPlaybackChange", {
+      detail: { playing: true },
+    })
+  );
+}
+
+/** Seek audio + (when playing) videos; when paused, only audio moves — videos sync on next play. */
+function movementSiteSeekTo(seconds) {
+  if (!bgm) return;
+  const dur =
+    typeof bgm.duration === "function" && bgm.duration() > 0
+      ? bgm.duration()
+      : 180;
+  const t = Math.max(0, Math.min(Number(seconds) || 0, dur));
+  const wasPlaying = bgm.isPlaying();
+
+  pendingVideoSyncTime = null;
+
+  try {
+    bgm.jump(t);
+  } catch (e) {
+    console.warn("[dancer] bgm.jump failed", e);
+    return;
+  }
+
+  if (wasPlaying) {
+    if (vid && typeof vid.time === "function") vid.time(t);
+    if (vidDither && typeof vidDither.time === "function") vidDither.time(t);
+  } else {
+    pendingVideoSyncTime = t;
+    if (bgm.isPlaying()) {
+      bgm.pause();
+    }
+    if (vid) vid.pause();
+    if (vidDither) vidDither.pause();
+  }
+}
 
 function preload() {
   bgm = loadSound("data/attention (with Justin Bieber) 2.mp3");
   // bpm = 120
   vid = createVideo("data/dance(cropped).mp4");
   //  vid = createVideo("data/dance_duo(cropped).mp4");
+  vidDither = createVideo("data/dancer-dithered.mp4");
+  largeMaskImg = loadImage("data/large mask.png");
   bodyPose = ml5.bodyPose();
   pacmanGif = loadImage("data/pacman.gif");
   statusFont = loadFont("data/Rungli-Italic.otf");
@@ -46,30 +163,139 @@ function preload() {
 function setup() {
   dancerWrapper = document.getElementById("dancerWrapper");
   let w = window.innerHeight * aspect;
-  let h = window.innerHeight ;
+  let h = window.innerHeight;
   let dancerCanvas = createCanvas(w, h, WEBGL).parent(dancerWrapper);
   resizeToWrapper();
   pixelDensity(2);
 
-
   amp = new p5.Amplitude();
   amp.setInput(bgm);
+  window.movementSiteAudio = {
+    amp,
+    bgm,
+    _bgmMuteSavedVol: 1,
+    isBgmMuted: false,
+    pausePlayback() {
+      if (bgm) bgm.pause();
+      if (vid) vid.pause();
+      if (vidDither) vidDither.pause();
+    },
+    resumePlayback() {
+      movementSiteStartPlaybackSynced();
+    },
+    seekTo(seconds) {
+      movementSiteSeekTo(seconds);
+    },
+    /** Timeline UI while paused: p5 SoundFile often doesn’t update currentTime() after jump until play. */
+    getUiPlaybackTime() {
+      if (!bgm) return 0;
+      if (!bgm.isPlaying()) {
+        if (pendingVideoSyncTime != null) return pendingVideoSyncTime;
+        return movementSiteReadPlaybackSeconds();
+      }
+      return typeof bgm.currentTime === "function" ? bgm.currentTime() : 0;
+    },
+    isPlaybackPlaying() {
+      return !!(bgm && bgm.isPlaying());
+    },
+    /** @returns {boolean} true if playing after toggle */
+    togglePlayback() {
+      if (this.isPlaybackPlaying()) {
+        this.pausePlayback();
+      } else {
+        this.resumePlayback();
+      }
+      return this.isPlaybackPlaying();
+    },
+    /** @returns {boolean} true if muted after toggle */
+    toggleMute() {
+      if (!bgm || typeof bgm.setVolume !== "function") {
+        return this.isBgmMuted;
+      }
+      this.isBgmMuted = !this.isBgmMuted;
+      if (this.isBgmMuted) {
+        if (typeof bgm.getVolume === "function") {
+          const v = bgm.getVolume();
+          if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+            this._bgmMuteSavedVol = v;
+          }
+        }
+        bgm.setVolume(0);
+      } else {
+        bgm.setVolume(this._bgmMuteSavedVol);
+      }
+      window.dispatchEvent(
+        new CustomEvent("movementMuteChange", {
+          detail: { muted: this.isBgmMuted },
+        })
+      );
+      return this.isBgmMuted;
+    },
+  };
   rectMode(CENTER);
   let videoAspect = 1944 / 1690;
-  vid.size(height * videoAspect, height)
+  vid.size(height * videoAspect, height);
   vid.hide();
 
   bodyPose.detectStart(vid, gotPoses);
   connections = bodyPose.getSkeleton();
   textFont(statusFont);
+
+  vidDither.hide();
+  vidDither.volume(0);
+  DitherMask.setMedia(vidDither, largeMaskImg);
+  DitherMask.resizeDitherMaskLayer(
+    vidDither,
+    largeMaskImg,
+    dancerWrapper,
+    width,
+    height
+  );
+  DitherMask.initOverlayCanvas();
+}
+
+function drawMaskedDitherVideo() {
+  const masked = DitherMask.updateMaskedDither(vidDither, largeMaskImg);
+  if (!masked) return;
+
+  const r = DitherMask.getDrawRect();
+  if (
+    !r ||
+    ![r.x, r.y, r.w, r.h].every(
+      (v) => typeof v === "number" && Number.isFinite(v)
+    )
+  ) {
+    return;
+  }
+  push();
+  translate(-width / 2, -height / 2);
+  noLights();
+  textureMode(IMAGE);
+  blendMode(DARKEST);
+  image(masked, r.x, r.y, r.w, r.h);
+  blendMode(BLEND);
+  pop();
 }
 
 function draw() {
-    // background(240);
+  // background(240);
+  // pointLight(255, 255, 255, 30, -40, 30);
 
+  if (largeMaskImg && largeMaskImg.width && !DitherMask.hasBuffers()) {
+    DitherMask.resizeDitherMaskLayer(
+      vidDither,
+      largeMaskImg,
+      dancerWrapper,
+      width,
+      height
+    );
+  }
+
+  drawMaskedDitherVideo();
+
+  // imageLight(pacmanGif);
   push();
   translate(-width / 3, -height * 0.35);
-  ;
   //   image(vid, 0, 0)
 
   beatDetection();
@@ -77,47 +303,52 @@ function draw() {
 
   stroke(beatColor);
 
-  // Draw the skeleton connections
+  // Draw the skeleton connections (same structure as before polygon-overlay work)
   for (let i = 0; i < poses.length; i++) {
-    // i detects person
-    // if (i > 1) {
     let pose = poses[i];
+    if (!pose || !pose.keypoints) continue;
+
     for (let j = 0; j < connections.length; j++) {
       let pointAIndex = connections[j][0];
       let pointBIndex = connections[j][1];
       let pointA = pose.keypoints[pointAIndex];
       let pointB = pose.keypoints[pointBIndex];
-      //   if ((j = 0)) {
-      //     // rect(pointA.x, pointA.y, pointB.x, pointB.y);
-      //   }
+      if (!pointA || !pointB) continue;
+
+      const confA =
+        typeof pointA.confidence === "number"
+          ? pointA.confidence
+          : typeof pointA.score === "number"
+            ? pointA.score
+            : 0;
+      const confB =
+        typeof pointB.confidence === "number"
+          ? pointB.confidence
+          : typeof pointB.score === "number"
+            ? pointB.score
+            : 0;
+
+      const pa = movementSiteKeypointXY(pointA);
+      const pb = movementSiteKeypointXY(pointB);
+      if (!pa || !pb) continue;
+
       if (j > 3) {
-        // Only draw a line if we have confidence in both points
-        if (pointA.confidence > 0.1 && pointB.confidence > 0.1) {
+        if (confA > 0.1 && confB > 0.1) {
           strokeWeight(4);
-          line(pointA.x, pointA.y, pointB.x, pointB.y);
-          if (j == 4){
-            
-            // fill(0);
-            // circle(pointA.x, pointA.y, 20);
-          }
+          line(pa.x, pa.y, pb.x, pb.y);
         }
       } else if (j == 1) {
-        if (pointA.confidence > 0.1 && pointB.confidence > 0.1) {
+        if (confA > 0.1 && confB > 0.1) {
           noFill();
+
+          push();
           strokeWeight(4);
-          circle(pointA.x, pointA.y, 100);
-          // image(
-          //   pacmanGif,
-          //   pointA.x - width / 10,
-          //   pointA.y - height / 5,
-          //   width / 5,
-          //   width / 5,
-          // );
-          //   sphere(pointA.x - width / 10, pointA.y - height / 5, 200);
+          translate(pa.x, pa.y, 0);
+          circle(0, 0, 100);
+          pop();
         }
       }
     }
-    // }
   }
   pop();
 
@@ -126,93 +357,88 @@ function draw() {
   fill(0);
   noStroke();
   textAlign(CENTER, TOP);
-  text(statusText, 0, -width / 3.7);
+  // text(statusText, 0, -width / 3.7);
   pop();
+
+  // Expose poses for external readers (pose-polygon-overlay.js) — after all drawing is done
+  window.movementSitePoses = poses;
 }
 
-function mousePressed() {
-  if (bgm.isPlaying()) {
-    bgm.pause();
-    vid.pause();
-    statusText = `bgm is paused`;
-  } else {
-    bgm.play();
-    vid.play();
-    statusText = `bgm is playing`;
-  }
-}
+// function mousePressed() {
+//   if (bgm.isPlaying()) {
+//     bgm.pause();
+//     vid.pause();
+//     vidDither.pause();
+//     statusText = `bgm is paused`;
+//   } else {
+//     bgm.play();
+//     vid.loop();
+//     vidDither.loop();
+//     statusText = `click anywhere to jump position in song`;
+//   }
+//   window.dispatchEvent(
+//     new CustomEvent("movementPlaybackChange", {
+//       detail: { playing: !!(bgm && bgm.isPlaying()) },
+//     })
+//   );
+// }
 
 // Callback function for when the model returns pose data
 function gotPoses(results) {
-  // Store the model's results in a global variable
-  poses = results;
+  if (Array.isArray(results)) {
+    poses = results;
+  } else if (results && results.keypoints) {
+    poses = [results];
+  } else {
+    poses = [];
+  }
 }
-
-
-
 
 // beat detect
 
 function beatDetection() {
-  const level = amp.getLevel();
+  const { beatTriggered } = MovementBeatDetection.step(amp, max);
 
-  // Beat detection (global volume)
-  const now = millis();
-  const inHold = now - beat.lastBeatMs < beat.holdTimeMs;
-
-  // Detect beat only if we're outside hold window
-  if (!inHold && level > beat.threshold) {
-    beat.lastBeatMs = now;
-    beat.threshold = level; // set new threshold to current volume (your rule)
-    flashUntilMs = now + 120; // flash duration (ms)
+  if (beatTriggered) {
+    flashUntilMs = millis() + 120;
   }
-
-  
-
-  // Decay threshold over time (your rule)
-  beat.threshold = max(beat.minThreshold, beat.threshold * beat.decayRate);
-  // Visual: shape changes color on beat
-  const isFlashing = now < flashUntilMs;
+  const isFlashing = millis() < flashUntilMs;
 
   if (isFlashing) {
     beatColorSwitch = !beatColorSwitch;
     beatPairCounter++;
-    if(beatPairCounter %5 == 0){
-        // fill(240,50)
-        // opacity(0.2)
-        // rect(100,100,2500, 2000)
-        // background(240);
-        clear();
+    if (beatPairCounter % 5 == 0) {
+      clear();
     }
-     
   }
 
-  let offsetX = - width / 6;
-    let offsetY = - height / 6;
+  let offsetX = -width / 6;
+  let offsetY = -height / 6;
+  const mouseSeg = movementSiteMouseLineCoords(offsetX, offsetY);
 
   if (beatColorSwitch) {
-    
-    beatColor = "#7b34ff";
-    if(bgm.isPlaying()){
-          fill("#7b34ff")
-    stroke("#77a03d")
-    circle(mouseX + offsetX, mouseY + offsetY, 20);
-    // strokeWeight(5);
-    // line(pmouseX + offsetX, pmouseY + offsetY, mouseX + offsetX, mouseY + offsetY);
+    // beatColor = "#7b34ff";
+    let r = map(sin(frameCount), -1, 1, 50, 123);
+    beatColor = color(r, 52, 255);
+    if (bgm.isPlaying() && mouseSeg) {
+      stroke("#77a03d");
+      strokeWeight(5);
+      line(mouseSeg[0], mouseSeg[1], mouseSeg[2], mouseSeg[3]);
     }
-
   } else {
-    beatColor = "#77a03d";
-    if(bgm.isPlaying()){
-
-    
-    fill("#77a03d")
-    stroke("#7b34ff")
-    rect(mouseX + offsetX, mouseY + offsetY, 20, 20);
-    // strokeWeight(5);
-    // line(pmouseX + offsetX, pmouseY + offsetY, mouseX + offsetX, mouseY + offsetY);
-
+    // beatColor = "#77a03d";
+    let r = map(sin(frameCount), -1, 1, 30, 123);
+    beatColor = color(r, 160, 62);
+    if (bgm.isPlaying() && mouseSeg) {
+      stroke("#7b34ff");
+      strokeWeight(5);
+      line(mouseSeg[0], mouseSeg[1], mouseSeg[2], mouseSeg[3]);
     }
+  }
+
+  if (typeof window !== "undefined") {
+    window.movementSiteBeat = window.movementSiteBeat || {};
+    window.movementSiteBeat.beatColorSwitch = beatColorSwitch;
   }
 
   // stroke(isFlashing ? "red" : "green");
@@ -241,7 +467,6 @@ function beatDebugUI() {
   //   rect(20, 105, thrW, 10, 4);
 }
 
-
 function windowResized() {
   resizeToWrapper();
 }
@@ -249,12 +474,21 @@ function windowResized() {
 function resizeToWrapper() {
   if (!dancerWrapper) return;
 
-  let w = window.innerWidth;
-  let h = w / aspect ;
-
-  // let h = wrapper4.offsetHeight;
-  // let w = h / aspect;
-
+  // Match #dancerWrapper CSS: height = 100vh, width = height * aspect-ratio
+  const vh = window.innerHeight;
+  const h = vh;
+  const w = vh * aspect;
 
   resizeCanvas(w, h);
+
+  const videoAspect = 1944 / 1690;
+  vid.size(height * videoAspect, height);
+
+  DitherMask.resizeDitherMaskLayer(
+    vidDither,
+    largeMaskImg,
+    dancerWrapper,
+    width,
+    height
+  );
 }

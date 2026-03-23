@@ -1,11 +1,34 @@
+@font-face {
+    font-family: "BRSonoma";
+    src: url("data/BRSonoma(regular).otf") format("opentype");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
 html, body {
-  margin: 0;
-  padding: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/* Smooth scroll for in-page anchors (e.g. #lyric-placer); must live on the scroll container, not the target */
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        scroll-behavior: smooth;
+    }
 }
 
 body{
     /* background-image: url(data/placeholder.png); */
-    background-color: #F0F0F0;
+    /* background-color: #F0F0F0; */
+    background-color: black;
+    cursor: none;
+}
+
+/* Show cursor only over info panel + right control stack (inherits to children; buttons keep pointer) */
+.panel-info,
+.panel-visualization-controls{
+    cursor: auto;
 }
 
 canvas {
@@ -15,11 +38,65 @@ canvas {
 
 #dancerWrapper{
     position: fixed;
-    z-index: 100;
+    z-index: 110;
     top: 0;
     left: 0;
     height: 100vh;
     aspect-ratio: 1728 / 990;
+    mix-blend-mode: color;
+}
+
+/* ml5 pose quad preview (pose-polygon-overlay.js) */
+#posePolygonOverlay {
+    position: fixed;
+    left: 47px;
+    top: 55%;
+    height: 156px;
+    transform: translateY(-50%);
+    z-index: 220;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/*
+ * Masked dither video — must sit ABOVE #dancerWrapper (110) or the WebGL canvas
+ * covers this layer and you only see it when dancer clear() briefly punches through.
+ * Below .large-mask-overlay (200) so PNG frame can still sit on top if needed.
+ */
+#ditherMaskCanvasWrapper {
+    position: fixed;
+    top: 0;
+    left: 47px;
+    width: calc(100vw - 47px);
+    height: 100vh;
+    z-index: 60;
+    pointer-events: none;
+    mix-blend-mode: normal;
+    opacity: 1;
+}
+
+#ditherMaskCanvasWrapper canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#flowFieldCanvasWrapper {
+    position: fixed;
+    top: 0;
+    left: 47px;
+    width: calc(100vw - 47px);
+    height: 100vh;
+    z-index: 65;
+    pointer-events: none;
+    mix-blend-mode: exclusion;
+    opacity: 0;
+}
+
+#flowFieldCanvasWrapper canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 #musicBackgroundWrapper{
@@ -32,17 +109,198 @@ canvas {
 }
 
 
-.placeholder-rect{
+#lyricsWrapper{
+    position: fixed;
+    top: 0;
+    left: calc((100vw - 47px) * 0.35);
+    width: 50vw;
+    height: calc(100vh - 100px);
+    z-index: 30;
+}
+
+
+.panel-visualization-controls{
+    position: fixed;
+    top: 0px;
+    right: 0px;
+    display: flex;
+    gap: 0px;
+    z-index: 300;
+    flex-direction: column;
+}
+
+.panel-controls-header{
+
+    width: 100%;
+    
+    font-family: "BRSonoma", system-ui, sans-serif;
+    padding: 0px 16px;
+    background-color: #FFE13F;
+    z-index: 300;
+}
+
+.controls-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+    accent-color: #852EFF;
+    padding: 16px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: auto;
+    
+}
+
+.controls-menu-title{
+    font-family: "BRSonoma", system-ui, sans-serif;
+    padding: 0px;
+    margin: 0px;
+    font-size: 14px;
+}
+
+.blend-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+    font-family: "ballpill-regular", system-ui, sans-serif;
+    font-size: 14px;
+    color: black;
+    transition: color 0.2s ease;
+}
+
+.blend-radio-label:hover {
+    color: #852EFF;
+}
+
+.blend-radio {
     position: absolute;
-    width: 300px;
-    height: 200px;
-    top: 2000px;
-    left: 100px;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.blend-radio-custom {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #852EFF;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s ease;
+}
+
+.blend-radio-custom::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #852EFF;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.blend-radio:checked + .blend-radio-custom::after {
+    opacity: 1;
+}
+
+/* Concentric face-reactive squares (face-squares.js) */
+#faceSquaresWrapper {
+    width: 150px;
+    height: 150px;
+    
+    pointer-events: none;
+}
+
+
+.btns-overall-control{
+    display: flex;
+    gap: 0px;
+}
+
+.btns-overall-control button{
+    width: 100%;
+    height: 43px;
+    border: none;
+    background-color: #852EFF;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 20px;
+}
+
+.controls-menu{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-color: #C8C8C8;
+    
+}
+
+
+/* Volume muted: gray speaker-x (scroll-controls.js toggles .btn-volume-muted) */
+.btns-overall-control button.btn-volume-muted i {
+    color: #939594;
+}
+
+button:hover{
+    background-color: #7824ee;
+    transition: background-color 0.3s ease;
+}
+
+.placeholder-rect, .img-album-cover{
+    position: absolute;
+    width: calc((100vw - 47px)*0.219);
+    top: 2140px;
+    left: calc((100vw - 47px)*0.159);
     
     background-color: black;
     
-    padding: 20px;
+    /* padding: 20px; */
 }
+
+.large-mask-foundation{
+    position: fixed;
+    top: 0;
+    left: 47px;
+    width: calc(100vw - 47px);
+    height: 100vh;
+    z-index: 50;
+}
+
+
+.large-mask-overlay{
+    position: fixed;
+    top: 0;
+    left: 47px;
+    width: calc(100vw - 47px);
+    height: 100vh;
+    z-index: 200;
+}
+
+.eye-vid{
+    position: absolute;
+    top: 4175px;
+    left: 15.8vw;
+    width: 21vw;
+    z-index: 1;
+}
+
+.img-end-screen{
+    position: absolute;
+    top: 7680px;
+    left: 55vw;
+    width:34vw;
+    z-index: 2;
+    mix-blend-mode: darken;
+}
+
 
 .rect-2{
     top: 4000px;
@@ -50,21 +308,480 @@ canvas {
     /* right: 200px; */
 }
 
-.rect-3{
-    top: 6000px;
-    left: 100px;
-    /* right: 200px; */
-}
-
 .placeholder-rects{
     position: absolute;
-    background-color: aqua;
     width: fit-content;
     height: 500px;
-    z-index: 200;
+    z-index: 30;
     padding-bottom: 200px;
 }
 
 .placeholder-rect p{
     color: white;
+}
+
+.img-mv-screenshot1{
+    position: absolute;
+    width: calc((100vw - 47px)*0.33);
+    top: 3580px;
+    z-index: 1;
+
+    left: 56.8vw;
+
+}
+
+.img-mv-screenshot2{
+    position: absolute;
+    width: calc((100vw - 47px)*0.33);
+    top: 4680px;
+    z-index: 1;
+
+    left: 56.8vw;
+}
+
+
+/* tooltip */
+#lyric-placer{
+    position: absolute;
+    top: 650px;
+    left: 0;
+    visibility: hidden;
+}
+
+/* Above #dancerWrapper (110) + .large-mask-overlay (200) so this layer receives the pointer;
+   otherwise the canvas/mask sit on top with body cursor:none and :hover never runs. */
+.tooltip-lyrics{
+    position: absolute;
+    top: 4%;
+    text-align: center;
+    left: 35%;
+    padding: 60px 100px;
+    z-index: 210;
+    pointer-events: auto;
+    color: #6B4BD6;
+    stroke: #282828;
+    text-shadow: 0 0px 40px rgba(0, 0, 0, 1);
+    font-family: "ballpill-regular", system-ui, sans-serif;
+    cursor: auto;
+}
+
+.tooltip-lyrics a{
+    color: #AFB8B3;
+    cursor: pointer;
+}
+
+.tooltip-lyrics a:hover{
+    color: #FFE13F;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.tooltip-pause-play{
+    position: fixed;
+    top: 0px;
+    width: 100%;
+    text-align: center;
+    left: 20px;
+    color: #AFB8B3;
+    z-index: 500;
+    font-size: 15px;
+    font-family: "BRSonoma", system-ui, sans-serif;
+}
+
+/* Panel: soundtrack (default) vs dancers — colors transition on button click */
+.panel-info{
+    --panel-bg: #C99AC8;
+    --pill-bg: #FFE13F;
+    --pill-text: #000000;
+    --btn-bg: #852EFF;
+    --controls-bg: #FFE13F;
+    --info-text: #000000;
+
+    position: fixed;
+    top: 0;
+    left: 47px;
+    width: calc((100vw - 45px)*0.138);
+    height: fit-content;
+    background-color: var(--panel-bg);
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+    text-align: center;
+    transition:
+        background-color 0.65s ease,
+        color 0.65s ease;
+}
+
+.panel-info.panel-info--dancers{
+    --panel-bg: #50BAFF;
+    --pill-bg: #FFB000;
+    --pill-text: #000000;
+    --btn-bg: #7c40f8;
+    --controls-bg: #FFB000;
+    --info-text: #000000;
+}
+
+/* Choreographer panel — pink field, mint oval + footer (reference layout) */
+.panel-info.panel-info--choreographer{
+    --panel-bg: #FFB000;
+    --pill-bg: #50BAFF;
+    --pill-text: #000000;
+    --btn-bg: #8A3FFC;
+    --controls-bg: #50BAFF;
+    --info-text: #000000;
+}
+
+/* designer panel */
+.panel-info.panel-info--designer{
+    --panel-bg: #E066C7;
+    --pill-bg: #FEF9C3;
+    --pill-text: #000000;
+    --btn-bg: #8A3FFC;
+    --controls-bg: #FEF9C3;
+    --info-text: #000000;
+}
+
+.panel-info-display-stack{
+    display: grid;
+    min-height: 156px;
+    width: 100%;
+}
+
+.panel-info.panel-info--choreographer .panel-info-text-wrap{
+    justify-items: center;
+    text-align: center;
+}
+
+.panel-info.panel-info--choreographer .panel-info-line--choreographer{
+    text-align: center;
+    width: 100%;
+}
+
+.panel-info-display-stack > .panel-info-display{
+    grid-area: 1 / 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 0;
+}
+
+.panel-info-display-stack > .panel-info-display.is-active{
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* Hide dancers before removing collapse class — avoids one frame of “three bubbles” snap-back */
+.panel-info-display-stack > .panel-info-display.panel-info-display--dancers.is-active.is-collapse-handoff{
+    opacity: 0;
+    visibility: hidden;
+    transition: none;
+    pointer-events: none;
+}
+
+/* Text-only sequential transition: pills stay; copy fades via color */
+.panel-info-display.is-active.is-text-exit li,
+.panel-info-display.is-active.is-text-exit .panel-choreographer-name{
+    color: transparent;
+    transition:
+        background-color 0.65s ease,
+        color 0.38s ease;
+}
+
+.panel-info-display.is-active.is-text-enter li,
+.panel-info-display.is-active.is-text-enter .panel-choreographer-name{
+    color: transparent;
+    transition: none;
+}
+
+/* Dancers → choreo: stretch label fade over the collapse so type disappears while bubbles move */
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers.is-active.is-text-exit li{
+    transition:
+        background-color 0.65s ease,
+        color 0.62s ease;
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-line.is-active.is-line-exiting{
+    transition: opacity 0.62s ease;
+}
+
+.panel-info-display li{
+    width: 100%;
+    background-color: var(--pill-bg);
+    color: var(--pill-text);
+    padding: 12px 10px;
+    border-radius: 100%;
+    transition:
+        background-color 0.65s ease,
+        color 0.65s ease;
+}
+
+.panel-info-display{
+    font-family: "ballpill-regular", system-ui, sans-serif;
+    height: 156px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0px;
+    padding-inline: 20px;
+    list-style: none;
+    margin: 0px;
+}
+
+.panel-info-controls{
+    background-color: var(--controls-bg);
+    font-family: "BRSonoma", system-ui, sans-serif;
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+    transition: background-color 0.65s ease;
+}
+
+.btn-info-change{
+    background-color: var(--btn-bg);
+    padding: 10px 14px;
+    border-radius: 0;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.65s ease;
+}
+
+.btn-info-change:focus-visible{
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.btn-info-change:disabled{
+    cursor: progress;
+    opacity: 0.88;
+}
+
+.btn-info-change i{
+    display: block;
+    line-height: 1;
+}
+
+@keyframes panel-info-icon-spin{
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.btn-info-change.is-spinning i{
+    animation: panel-info-icon-spin 0.65s ease;
+}
+
+.panel-info-text-wrap{
+    flex: 1;
+    display: grid;
+    align-items: center;
+    padding: 0 16px;
+    min-height: 48px;
+}
+
+.panel-info-line{
+    grid-area: 1 / 1;
+    margin: 0;
+    font-size: 15.5px;
+    color: var(--info-text);
+    opacity: 0;
+    transition: opacity 0.45s ease;
+    text-align: left;
+}
+
+.panel-info-line.is-active{
+    opacity: 1;
+}
+
+.panel-info-line.is-active.is-line-exiting{
+    opacity: 0;
+    transition: opacity 0.38s ease;
+}
+
+.panel-info-line.is-active.is-line-entering{
+    opacity: 0;
+    transition: none;
+}
+
+/* Choreographer: same “bubble” sizing as soundtrack / dancer list items */
+.panel-info-display--choreographer{
+    justify-content: center;
+    align-items: center;
+}
+
+.panel-choreographer-oval{
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    background-color: var(--pill-bg);
+    color: var(--pill-text);
+    padding: 12px 10px;
+    border-radius: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background-color 0.65s ease,
+        color 0.65s ease;
+}
+
+.panel-choreographer-name{
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+    color: var(--pill-text);
+    text-align: center;
+    transition: color 0.45s ease;
+}
+
+/* ── Dancers → choreographer: outer bubbles slide fully behind the middle one ── */
+
+/* Each pill ≈ 44px tall (12px pad + ~20px text + 12px pad); use 100% as the
+   translate distance so the value tracks the actual rendered height exactly. */
+@keyframes panel-circle-collapse-1{
+    to { transform: translateY(100%); }
+}
+
+@keyframes panel-circle-collapse-3{
+    to { transform: translateY(-100%); }
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers{
+    overflow: hidden;
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers li{
+    position: relative;
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers li:nth-child(1){
+    z-index: 1;
+    animation: panel-circle-collapse-1 0.72s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers li:nth-child(2){
+    z-index: 3;
+}
+
+.panel-info.panel-info--collapse-circles .panel-info-display--dancers li:nth-child(3){
+    z-index: 1;
+    animation: panel-circle-collapse-3 0.72s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+/* ── Choreographer → Designer: one oval splits outward into two ──
+   Instead of a ::after ghost, we show the designer display immediately (with
+   its two ovals starting stacked at center) and animate them apart.
+   The choreographer oval fades out simultaneously. */
+
+.panel-info-display--designer{
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+.panel-designer-oval{
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    background-color: var(--pill-bg);
+    color: var(--pill-text);
+    padding: 12px 10px;
+    border-radius: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background-color 0.65s ease,
+        color 0.65s ease;
+}
+
+.panel-designer-name{
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+    color: var(--pill-text);
+    text-align: center;
+    transition: color 0.45s ease;
+}
+
+.panel-info.panel-info--designer .panel-info-text-wrap{
+    justify-items: center;
+    text-align: center;
+}
+
+.panel-info.panel-info--designer .panel-info-line--designer{
+    text-align: center;
+    width: 100%;
+}
+
+/* Expand: designer ovals start overlapping at center, then slide apart */
+@keyframes panel-oval-split-up{
+    from { transform: translateY(50%); }
+    to   { transform: translateY(0); }
+}
+
+@keyframes panel-oval-split-down{
+    from { transform: translateY(-50%); }
+    to   { transform: translateY(0); }
+}
+
+/* During the expand phase, show the designer display (with split animation),
+   and keep the choreographer visible but fading out behind it */
+.panel-info.panel-info--expand-oval .panel-info-display--designer{
+    opacity: 1;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.panel-info.panel-info--expand-oval .panel-info-display--designer .panel-designer-oval--name{
+    animation: panel-oval-split-up 0.72s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+.panel-info.panel-info--expand-oval .panel-info-display--designer .panel-designer-oval--semester{
+    animation: panel-oval-split-down 0.72s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+/* Text starts transparent during expand, fades in after the animation completes (JS removes is-text-enter) */
+.panel-info.panel-info--expand-oval .panel-info-display--designer .panel-designer-name{
+    color: transparent;
+}
+
+/* Choreographer disappears immediately so only the 2 designer ovals are visible */
+.panel-info.panel-info--expand-oval .panel-info-display--choreographer{
+    opacity: 0 !important;
+    pointer-events: none;
+    transition: none;
+}
+
+.panel-info.panel-info--expand-oval .panel-info-line.is-active.is-line-exiting{
+    transition: opacity 0.62s ease;
+}
+
+@media (prefers-reduced-motion: reduce){
+    .panel-info,
+    .panel-info-display li,
+    .panel-info-controls,
+    .btn-info-change,
+    .panel-info-display-stack > .panel-info-display,
+    .panel-info-line{
+        transition-duration: 0.01ms;
+    }
+    .btn-info-change.is-spinning i{
+        animation: none;
+    }
+
+    .panel-info.panel-info--collapse-circles .panel-info-display--dancers li{
+        animation: none;
+    }
+
+    .panel-info.panel-info--expand-oval .panel-info-display--designer .panel-designer-oval{
+        animation: none;
+    }
 }
