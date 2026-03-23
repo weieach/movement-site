@@ -253,7 +253,7 @@
     ctx.clearRect(0, 0, cw, ch);
 
     ctx.save();
-    ctx.fillStyle = "#0078C0";
+    ctx.fillStyle = "#4814A3";
     ctx.fillRect(0, 0, cw, ch);
     ctx.restore();
 
