@@ -4,6 +4,9 @@ let vidDither;
 let largeMaskImg;
 let pacmanGif;
 let statusFont;
+let skyBG;
+
+let rotatingBoxLayer;
 
 let statusText = "click to play";
 let amp;
@@ -158,6 +161,7 @@ function preload() {
   pacmanGif = loadImage("data/pacman.gif");
   statusFont = loadFont("data/Rungli-Italic.otf");
   bgmMidi = loadJSON("data/VisiPiano.json");
+  skyBG = loadImage("data/sky-bg.jpeg")
 }
 
 function setup() {
@@ -167,6 +171,9 @@ function setup() {
   let dancerCanvas = createCanvas(w, h, WEBGL).parent(dancerWrapper);
   resizeToWrapper();
   pixelDensity(2);
+  rotatingBoxLayer = createGraphics(width, height, WEBGL);
+
+
 
   amp = new p5.Amplitude();
   amp.setInput(bgm);
@@ -281,6 +288,10 @@ function draw() {
   // background(240);
   // pointLight(255, 255, 255, 30, -40, 30);
 
+
+  
+
+
   if (largeMaskImg && largeMaskImg.width && !DitherMask.hasBuffers()) {
     DitherMask.resizeDitherMaskLayer(
       vidDither,
@@ -334,7 +345,7 @@ function draw() {
 
       if (j > 3) {
         if (confA > 0.1 && confB > 0.1) {
-          strokeWeight(4);
+          strokeWeight(5);
           line(pa.x, pa.y, pb.x, pb.y);
         }
       } else if (j == 1) {
@@ -342,7 +353,7 @@ function draw() {
           noFill();
 
           push();
-          strokeWeight(4);
+          strokeWeight(5);
           translate(pa.x, pa.y, 0);
           circle(0, 0, 100);
           pop();
@@ -350,7 +361,23 @@ function draw() {
       }
     }
   }
+  
   pop();
+
+    rotatingBoxLayer.clear();
+  // rotatingBoxLayer.blendMode(SCREEN);
+  rotatingBoxLayer.push();
+  // rotatingBoxLayer.image(skyBG, 0, 0)
+  rotatingBoxLayer.translate(0, 0, -width/2);
+  rotatingBoxLayer.rotateY(frameCount / 400);
+  // rotatingBoxLayer.background("#000000");
+  rotatingBoxLayer.noFill();
+  rotatingBoxLayer.stroke("#434343");
+  rotatingBoxLayer.box(width* 1.5, height*1.5, width/1.5);
+  rotatingBoxLayer.pop();
+
+  image(rotatingBoxLayer, -width/2 + 47, -height/2);
+  
 
   push();
   textSize(30);
@@ -480,6 +507,14 @@ function resizeToWrapper() {
   const w = vh * aspect;
 
   resizeCanvas(w, h);
+  if (
+    !rotatingBoxLayer ||
+    rotatingBoxLayer.width !== width ||
+    rotatingBoxLayer.height !== height
+  ) {
+    rotatingBoxLayer = createGraphics(width, height, WEBGL);
+    rotatingBoxLayer.pixelDensity(1);
+  }
 
   const videoAspect = 1944 / 1690;
   vid.size(height * videoAspect, height);
